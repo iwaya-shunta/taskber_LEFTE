@@ -1,7 +1,17 @@
+import sys
 import random
 from PySide6.QtWidgets import QWidget, QApplication
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QPainter, QPixmap
+
+# Windows用の最前面固定API
+if sys.platform == "win32":
+    import ctypes
+    from ctypes import wintypes
+    HWND_TOPMOST = -1
+    SWP_NOMOVE = 0x0002
+    SWP_NOSIZE = 0x0001
+    SWP_NOACTIVATE = 0x0010
 
 from src.config import (
     ASSETS_DIR, CHAR_SIZE, BOUNCE_MARGIN,
@@ -105,12 +115,24 @@ class MascotWidget(QWidget):
     # src/mascot.py 内の init_position を修正
     def init_position(self):
         screen = QApplication.primaryScreen()
-        full_rect = screen.geometry()
-        work_rect = screen.availableGeometry()
+        work_rect = screen.availableGeometry()  # ★ タスクバーを除いた作業領域
 
-        x = full_rect.right() - TRAY_OFFSET_X
-        y = full_rect.bottom() - self.height() - 4
+        # X座標: トレイアイコンの左側
+        x = work_rect.right() - TRAY_OFFSET_X
+        # Y座標: タスクバーの上端にちょうど乗せる
+        y = work_rect.bottom() - self.height() +20
+
         self.move(x, y)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        # Windowsの最前面レイヤー（HWND_TOPMOST）を直接セット
+        if sys.platform == "win32":
+            hwnd = int(self.winId())
+            ctypes.windll.user32.SetWindowPos(
+                hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
+            )
 
     def start_speaking(self):
         self.is_speaking = True
