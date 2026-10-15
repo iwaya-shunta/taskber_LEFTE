@@ -25,9 +25,14 @@ Desktop.ini
 $RECYCLE.BIN/
 
 # 音声一時ファイルやビルド成果物
+temp_voice.wav
 *.wav
 *.mp3
 build/
 dist/
 *.spec
+
+# フォルダ指定
+cache/
+
 "@ | Out-File -Encoding utf8 .gitignore

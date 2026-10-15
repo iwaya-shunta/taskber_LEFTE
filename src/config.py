@@ -3,10 +3,15 @@ from pathlib import Path
 # パス設定
 BASE_DIR = Path(__file__).resolve().parent.parent
 ASSETS_DIR = BASE_DIR / "assets"
+CACHE_DIR = BASE_DIR / "cache"
+CACHE_DIR.mkdir(exist_ok=True)
+
+TEMP_VOICE_PATH = CACHE_DIR / "temp_voice.wav"
 
 # マスコット設定
 CHAR_SIZE = 65           # アイコン表示サイズ
 BOUNCE_MARGIN = 10       # バウンド用の上部余白
+TRAY_OFFSET_X = 225
 MOUTH_INTERVAL_MS = 110  # 口パクの切り替え速度 (ms)
 BLINK_MIN_MS = 4000      # まばたき最小間隔 (ms)
 BLINK_MAX_MS = 9000      # まばたき最大間隔 (ms)
@@ -14,3 +19,9 @@ BLINK_MAX_MS = 9000      # まばたき最大間隔 (ms)
 # VOICEVOX 設定
 VOICEVOX_HOST = "http://127.0.0.1:50021"
 SPEAKER_ID = 3           # デフォルトのスピーカーID (3: ずんだもん ノーマル等)
+
+# 音声パラメータ微調整
+VOICE_SPEED_SCALE = 1.05   # 話速 (1.0が標準。少しキビキビ喋らせるなら 1.05〜1.1)
+VOICE_PITCH_SCALE = 0.0    # 音高 (-0.15 〜 0.15)
+VOICE_INTONATION_SCALE = 1.0 # 抑揚 (1.0が標準)
+VOICE_VOLUME_SCALE = 1.0   # 音量

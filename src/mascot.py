@@ -3,11 +3,10 @@ from PySide6.QtWidgets import QWidget, QApplication
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QPainter, QPixmap
 
-from .config import (
+from src.config import (
     ASSETS_DIR, CHAR_SIZE, BOUNCE_MARGIN,
-    MOUTH_INTERVAL_MS, BLINK_MIN_MS, BLINK_MAX_MS
+    MOUTH_INTERVAL_MS, BLINK_MIN_MS, BLINK_MAX_MS, TRAY_OFFSET_X
 )
-
 
 class MascotWidget(QWidget):
     """タスクバートレイに常駐するPNGTuberマスコット"""
@@ -103,17 +102,14 @@ class MascotWidget(QWidget):
             self.bounce_y = 0.0
         self.update()
 
+    # src/mascot.py 内の init_position を修正
     def init_position(self):
         screen = QApplication.primaryScreen()
         full_rect = screen.geometry()
         work_rect = screen.availableGeometry()
 
-        taskbar_height = full_rect.bottom() - work_rect.bottom()
-        if taskbar_height <= 0:
-            taskbar_height = 30
-
-        x = full_rect.right() - 330
-        y = work_rect.bottom() + (taskbar_height - self.char_size) // 2 - self.bounce_margin
+        x = full_rect.right() - TRAY_OFFSET_X
+        y = full_rect.bottom() - self.height() - 4
         self.move(x, y)
 
     def start_speaking(self):
