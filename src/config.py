@@ -23,7 +23,13 @@ BLINK_MAX_MS = 9000      # まばたき最大間隔 (ms)
 
 # VOICEVOX 設定
 VOICEVOX_HOST = "http://127.0.0.1:50021"
-SPEAKER_ID = 3           # デフォルトのスピーカーID (3: ずんだもん ノーマル等)
+SPEAKER_ID = 8           # デフォルトのスピーカーID (3: ずんだもん ノーマル等)
+
+# 声の元気さ・ノリを出すパラメータ調整
+VOICE_SPEED_SCALE = 1.15       # 話速: 少しキビキビと早口にする（1.1〜1.2推奨）
+VOICE_PITCH_SCALE = 0.05       # 音高: ほんの少しだけ高くして明るさを出す
+VOICE_INTONATION_SCALE = 1.25  # 抑揚: 感情の起伏をハッキリ大きくする（1.2〜1.3推奨）
+VOICE_VOLUME_SCALE = 1.0
 
 # 音声パラメータ微調整
 VOICE_SPEED_SCALE = 1.05   # 話速 (1.0が標準。少しキビキビ喋らせるなら 1.05〜1.1)

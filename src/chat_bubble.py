@@ -79,7 +79,7 @@ class ChatBubble(QWidget):
         container_layout.setContentsMargins(12, 12, 12, 12)
         container_layout.setSpacing(8)
 
-        header = QLabel("AI相棒", self.container)
+        header = QLabel("L.E.F.T.E. ver.2.0", self.container)
         header.setStyleSheet("color: #8E8E93; font-size: 12px; font-weight: bold;")
         container_layout.addWidget(header)
 
@@ -147,3 +147,13 @@ class ChatBubble(QWidget):
     def scroll_to_bottom(self):
         bar = self.scroll_area.verticalScrollBar()
         bar.setValue(bar.maximum())
+    
+    def load_history(self, messages: list):
+        """過去メッセージのリストを一括でUIに追加"""
+        for item in messages:
+            role = item.get("role")
+            content = item.get("content")
+            if not content:
+                continue
+            is_user = (role == "user")
+            self.add_bubble(content, is_user=is_user)

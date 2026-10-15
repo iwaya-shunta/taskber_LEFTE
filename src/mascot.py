@@ -142,9 +142,9 @@ class MascotWidget(QWidget):
 
     def stop_speaking(self):
         self.is_speaking = False
-        self.bounce_timer.stop()
-        self.bounce_y = 0.0
-        self.mouth_open = False
+        self.mouth_state = "close"     # ★ 口を閉じる状態に戻す
+        self.mouth_timer.stop()        # 口パク用タイマーを停止
+        self.bounce_y = 0.0            # バウンド位置をリセット
         self.update()
 
     def paintEvent(self, event):

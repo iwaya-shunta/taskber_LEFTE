@@ -11,10 +11,20 @@ from src.config import (
 )
 
 
-def sanitize_text_for_voice(text: str) -> str:
-    """VOICEVOXが読み上げにくい記号やURLをカット・置換"""
+def clean_text_for_voice(text: str) -> str:
+    """VOICEVOX読み上げ用にURL、記号、（動作・感情表現）、顔文字、速度タグを除去"""
+    # 1. URL・Markdown記法を除去
     text = re.sub(r'https?://[\w/:%#\$&\?\(\)~\.=\+\-]+', '', text)
     text = re.sub(r'[`*#_]', '', text)
+
+    # 2. [slow] [normal] [fast] などのタグを除去
+    text = re.sub(r'\[.*?\]', '', text)
+
+    # 3. 全角・半角の丸括弧とその中身を除去（例：（にっこり）、(ドヤ顔)、(๑•̀ㅂ•́)و 等）
+    text = re.sub(r'（.*?）', '', text)
+    text = re.sub(r'\(.*?\)', '', text)
+
+    # 4. 余分な空白のトリム
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
@@ -25,7 +35,8 @@ class SynthesisWorker(QThread):
 
     def __init__(self, text: str):
         super().__init__()
-        self.text = sanitize_text_for_voice(text)
+        # ★ clean_text_for_voice を通して読み上げテキストをクリーン化
+        self.text = clean_text_for_voice(text)
 
     def run(self):
         if not self.text:
@@ -48,8 +59,7 @@ class SynthesisWorker(QThread):
             query_data["intonationScale"] = VOICE_INTONATION_SCALE
             query_data["volumeScale"] = VOICE_VOLUME_SCALE
             
-            # ★ 対策1: 発声末尾の無音マージンを少し増やす（デフォルト約0.1秒 -> 0.25秒）
-            # これにより語尾の波形が切れるのを防ぐ
+            # 発声末尾の無音マージン確保（語尾切れ防止）
             query_data["postPhonemeLength"] = 0.25
 
             # 3. 音声合成
@@ -81,14 +91,13 @@ class VoicevoxClient(QObject):
         self.player = QMediaPlayer()
         self.player.setAudioOutput(self.audio_output)
         
-        # 再生完了状態（EndOfMedia）を正確に監視
+        # 再生完了状態（EndOfMedia）を監視
         self.player.mediaStatusChanged.connect(self._on_media_status_changed)
         self.player.playbackStateChanged.connect(self._on_playback_state_changed)
 
         self._worker = None
 
     def speak(self, text: str):
-        # 以前の再生を停止
         if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
             self.player.stop()
 
@@ -110,7 +119,6 @@ class VoicevoxClient(QObject):
             self.playback_started.emit()
 
     def _on_media_status_changed(self, status):
-        # 音声メディアが最後まで再生し終わったタイミングを検知
         if status == QMediaPlayer.MediaStatus.EndOfMedia:
-            # 語尾の自然な余韻のため、少しだけ遅延させてから終了シグナルを送る
+            # 語尾の自然な余韻マージン
             QTimer.singleShot(150, self.playback_finished.emit)

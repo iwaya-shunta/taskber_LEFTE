@@ -4,7 +4,7 @@ from PySide6.QtWidgets import QApplication
 from src.mascot import MascotWidget
 from src.chat_bubble import ChatBubble
 from src.voice_client import VoicevoxClient
-from src.api_client import BackendClient
+from src.api_client import BackendClient, HistoryFetchWorker
 
 
 class DesktopAssistantApp:
@@ -28,6 +28,14 @@ class DesktopAssistantApp:
         self.update_bubble_position()
         self.mascot.show()
 
+        # 過去ログ取得スレッドの実行
+        self.history_worker = HistoryFetchWorker()
+        self.history_worker.finished_fetch.connect(self.bubble.load_history)
+        self.history_worker.error_occurred.connect(
+            lambda err: print(f"[History Load]: 履歴取得をスキップ ({err})")
+        )
+        self.history_worker.start()
+
     def toggle_chat(self):
         if self.bubble.isVisible():
             self.bubble.hide()
@@ -40,8 +48,8 @@ class DesktopAssistantApp:
         screen = QApplication.primaryScreen()
         work_rect = screen.availableGeometry()
 
-        bubble_x = work_rect.right() - self.bubble.width() - 16
-        bubble_y = work_rect.bottom() - self.bubble.height() - 8
+        bubble_x = work_rect.right() - self.bubble.width() + 2
+        bubble_y = work_rect.bottom() - self.bubble.height() - 45
         self.bubble.move(bubble_x, bubble_y)
 
     def handle_user_message(self, text: str):

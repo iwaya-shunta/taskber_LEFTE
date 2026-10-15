@@ -1,6 +1,6 @@
 import requests
 from PySide6.QtCore import QObject, Signal, QThread
-from src.config import CHAT_ENDPOINT
+from src.config import SERVER_HOST, CHAT_ENDPOINT
 
 
 class ServerRequestWorker(QThread):
@@ -52,3 +52,17 @@ class BackendClient(QObject):
     def _handle_error(self, err_msg: str):
         print(f"[Backend Client]: {err_msg}")
         self.response_received.emit(err_msg)
+
+
+class HistoryFetchWorker(QThread):
+    finished_fetch = Signal(list)
+    error_occurred = Signal(str)
+
+    def run(self):
+        try:
+            res = requests.get(f"{SERVER_HOST}/history?limit=30", timeout=5)
+            res.raise_for_status()
+            data = res.json()
+            self.finished_fetch.emit(data)
+        except Exception as e:
+            self.error_occurred.emit(str(e))
