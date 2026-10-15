@@ -10,6 +10,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 ASSETS_DIR = BASE_DIR / "assets"
 CACHE_DIR = BASE_DIR / "cache"
 CACHE_DIR.mkdir(exist_ok=True)
+VOICEVOX_EXE_PATH = r"C:\Program Files\VOICEVOX\VOICEVOX.exe"
 
 TEMP_VOICE_PATH = CACHE_DIR / "temp_voice.wav"
 

@@ -5,6 +5,7 @@ from src.mascot import MascotWidget
 from src.chat_bubble import ChatBubble
 from src.voice_client import VoicevoxClient
 from src.api_client import BackendClient, HistoryFetchWorker
+from src.process_manager import VoicevoxProcessManager
 
 
 class DesktopAssistantApp:
@@ -13,6 +14,8 @@ class DesktopAssistantApp:
         self.bubble = ChatBubble()
         self.voice = VoicevoxClient()
         self.backend = BackendClient()
+        self.voice_manager = VoicevoxProcessManager()
+        self.voice_manager.start_engine()
 
         # イベント接続
         self.mascot.clicked.connect(self.toggle_chat)
@@ -62,8 +65,15 @@ class DesktopAssistantApp:
         # 返答テキストをVOICEVOXで喋らせる（口パク自動連動）
         self.voice.speak(reply_text)
 
+    def quit_app(self):
+        """アプリケーション正常終了処理"""
+        print("[App]: アプリケーションを終了します。")
+        self.voice_manager.stop_engine()
+        QApplication.quit()
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     assistant = DesktopAssistantApp()
+    app.aboutToQuit.connect(assistant.voice_manager.stop_engine)
     sys.exit(app.exec())
