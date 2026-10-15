@@ -1,38 +1,198 @@
 import sys
 import random
+import ctypes
 from pathlib import Path
 
-# --- PySide6 のインポート ---
-from PySide6.QtWidgets import QApplication, QWidget
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QPainter, QPixmap
+from PySide6.QtWidgets import (
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout,
+    QLineEdit, QScrollArea, QLabel, QGraphicsDropShadowEffect
+)
+from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtGui import QPainter, QPixmap, QColor
 
-# --- パス設定 ---
-# このスクリプト (src/main.py) から見て親フォルダ (taskber_LEFTE) の assets を指す
 BASE_DIR = Path(__file__).resolve().parent.parent
 ASSETS_DIR = BASE_DIR / "assets"
+
+
+class RECT(ctypes.Structure):
+    _fields_ = [
+        ('left', ctypes.c_long),
+        ('top', ctypes.c_long),
+        ('right', ctypes.c_long),
+        ('bottom', ctypes.c_long)
+    ]
+
+
+def get_taskbar_rect():
+    """Windowsタスクバーの正確な位置とサイズを取得"""
+    hwnd = ctypes.windll.user32.FindWindowW("Shell_TrayWnd", None)
+    rect = RECT()
+    ctypes.windll.user32.GetWindowRect(hwnd, ctypes.byref(rect))
+    return rect
+
+
+class MessageBubble(QWidget):
+    """LINE/Instagram風の個別メッセージ吹き出し"""
+    def __init__(self, text: str, is_user: bool):
+        super().__init__()
+        main_layout = QHBoxLayout(self)
+        main_layout.setContentsMargins(4, 2, 4, 2)
+
+        label = QLabel(text)
+        label.setWordWrap(True)
+        label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+
+        if is_user:
+            main_layout.addStretch()
+            main_layout.addWidget(label)
+            label.setStyleSheet("""
+                QLabel {
+                    background-color: #007AFF;
+                    color: #FFFFFF;
+                    border-radius: 14px;
+                    border-bottom-right-radius: 4px;
+                    padding: 8px 12px;
+                    font-size: 13px;
+                    max-width: 220px;
+                }
+            """)
+        else:
+            main_layout.addWidget(label)
+            main_layout.addStretch()
+            label.setStyleSheet("""
+                QLabel {
+                    background-color: #2C2C2E;
+                    color: #F2F2F7;
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    border-radius: 14px;
+                    border-bottom-left-radius: 4px;
+                    padding: 8px 12px;
+                    font-size: 13px;
+                    max-width: 220px;
+                }
+            """)
+
+
+class ChatBubble(QWidget):
+    """左下からポップアップするチャットウィンドウ"""
+    message_sent = Signal(str)
+
+    def __init__(self):
+        super().__init__()
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.Tool
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.resize(340, 420)
+
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(8, 8, 8, 8)
+
+        self.container = QWidget(self)
+        self.container.setObjectName("MainContainer")
+        self.container.setStyleSheet("""
+            QWidget#MainContainer {
+                background-color: rgba(22, 24, 30, 0.95);
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: 16px;
+            }
+        """)
+
+        container_layout = QVBoxLayout(self.container)
+        container_layout.setContentsMargins(12, 12, 12, 12)
+        container_layout.setSpacing(8)
+
+        # ヘッダー
+        header = QLabel("AI相棒", self.container)
+        header.setStyleSheet("color: #8E8E93; font-size: 12px; font-weight: bold;")
+        container_layout.addWidget(header)
+
+        # チャットスクロールエリア
+        self.scroll_area = QScrollArea(self.container)
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.scroll_area.setStyleSheet("""
+            QScrollArea { background: transparent; border: none; }
+            QScrollBar:vertical { background: transparent; width: 4px; margin: 0; }
+            QScrollBar::handle:vertical { background: rgba(255, 255, 255, 0.25); border-radius: 2px; }
+        """)
+
+        self.chat_content = QWidget()
+        self.chat_content.setStyleSheet("background: transparent;")
+        self.chat_layout = QVBoxLayout(self.chat_content)
+        self.chat_layout.setContentsMargins(0, 0, 0, 0)
+        self.chat_layout.setSpacing(6)
+        self.chat_layout.addStretch()
+
+        self.scroll_area.setWidget(self.chat_content)
+        container_layout.addWidget(self.scroll_area)
+
+        # 入力欄
+        self.input_field = QLineEdit(self.container)
+        self.input_field.setPlaceholderText("メッセージを入力...")
+        self.input_field.setStyleSheet("""
+            QLineEdit {
+                background-color: rgba(255, 255, 255, 0.08);
+                color: #FFFFFF;
+                border: 1px solid transparent;
+                border-radius: 16px;
+                padding: 8px 14px;
+                font-size: 13px;
+            }
+            QLineEdit:focus {
+                background-color: rgba(255, 255, 255, 0.14);
+                border: 1px solid #007AFF;
+            }
+        """)
+        self.input_field.returnPressed.connect(self.send_message)
+        container_layout.addWidget(self.input_field)
+
+        outer_layout.addWidget(self.container)
+
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(24)
+        shadow.setColor(QColor(0, 0, 0, 180))
+        shadow.setOffset(2, 6)
+        self.container.setGraphicsEffect(shadow)
+
+    def send_message(self):
+        text = self.input_field.text().strip()
+        if text:
+            self.add_bubble(text, is_user=True)
+            self.input_field.clear()
+            self.message_sent.emit(text)
+
+    def append_response(self, text: str):
+        self.add_bubble(text, is_user=False)
+
+    def add_bubble(self, text: str, is_user: bool):
+        bubble = MessageBubble(text, is_user=is_user)
+        self.chat_layout.insertWidget(self.chat_layout.count() - 1, bubble)
+        QTimer.singleShot(20, self.scroll_to_bottom)
+
+    def scroll_to_bottom(self):
+        bar = self.scroll_area.verticalScrollBar()
+        bar.setValue(bar.maximum())
 
 
 class VeadotubeMascot(QWidget):
     def __init__(self):
         super().__init__()
-
-        # --- ウィンドウ設定 ---
         self.setWindowFlags(
-            Qt.WindowType.FramelessWindowHint |     # タイトルバーや枠線を消す
-            Qt.WindowType.WindowStaysOnTopHint |    # 常に最前面
-            Qt.WindowType.Tool                      # タスクバーのアプリアイコン一覧に非表示
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.Tool
         )
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground) # 背景透過
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
-        # 表示サイズの設定
-        self.char_size = 120       # キャラクター自体の表示サイズ（ピクセル）
-        self.bounce_margin = 15  # キャラクターが上に跳ねたときに見切れないための上部余白
-        
-        # ウィンドウ全体のサイズ（高さは余白分を足す）
+        # --- タスクバー枠内に収まるサイズ設定 ---
+        self.char_size = 80       # タスクバー内のアイコンと同等のサイズ
+        self.bounce_margin = 12     # 小さめの跳ね用余白
         self.resize(self.char_size, self.char_size + self.bounce_margin)
 
-        # --- 4種類のPNGスプライト読み込み ---
+        # スプライト読み込み
         self.sprites = {
             "idle_open": self.load_sprite("idle_open.png"),
             "idle_closed": self.load_sprite("idle_closed.png"),
@@ -40,42 +200,39 @@ class VeadotubeMascot(QWidget):
             "talk_closed": self.load_sprite("talk_closed.png"),
         }
 
-        # --- アニメーション状態 ---
-        self.is_speaking = False   # 発話中フラグ (True / False)
-        self.mouth_open = False    # 口が開いているか
-        self.eye_open = True       # 目が開いているか
-        self.bounce_y = 0.0        # 跳ねている高さオフセット
+        self.is_speaking = False
+        self.mouth_open = False
+        self.eye_open = True
+        self.bounce_y = 0.0
 
-        # タスクバー真上への位置合わせ
+        # タスクバー左端に配置
         self.init_position()
 
-        # --- タイマー群 ---
-        # 1. 描画ループ (約60FPS)
+        # チャット吹き出し
+        self.bubble = ChatBubble()
+        self.bubble.message_sent.connect(self.on_user_message)
+        self.update_bubble_position()
+
+        # タイマー群
         self.draw_timer = QTimer(self)
         self.draw_timer.timeout.connect(self.update_animation)
         self.draw_timer.start(16)
 
-        # 2. 口パクタイマー (発話中は 130ms ごとに開閉)
         self.mouth_timer = QTimer(self)
         self.mouth_timer.timeout.connect(self.toggle_mouth)
         self.mouth_timer.start(110)
 
-        # 3. まばたきタイマー
         self.blink_timer = QTimer(self)
         self.blink_timer.timeout.connect(self.start_blink)
         self.schedule_next_blink()
 
-        # バウンド専用タイマー: 口パクとは別に、たまにピョコッと跳ねるようにする
         self.bounce_timer = QTimer(self)
-        self.bounce_timer.setSingleShot(True)  # 1回ごとに間隔を変えて呼ぶ設定
+        self.bounce_timer.setSingleShot(True)
         self.bounce_timer.timeout.connect(self.handle_random_bounce)
 
     def load_sprite(self, filename: str) -> QPixmap:
-        """500x500のPNGを高画質のまま指定サイズに滑らか縮小して読み込む"""
         path = ASSETS_DIR / filename
         pixmap = QPixmap(str(path))
-        
-        # SmoothTransformation を指定してジャギー（ギザギザ）を出さずに縮小
         return pixmap.scaled(
             self.char_size, self.char_size,
             Qt.AspectRatioMode.KeepAspectRatio,
@@ -83,107 +240,128 @@ class VeadotubeMascot(QWidget):
         )
 
     def schedule_next_blink(self):
-        """2.5秒〜5.5秒のランダムな時間で次のまばたきを予約"""
-        self.blink_timer.start(random.randint(2500, 7000))
-    
-    def schedule_next_bounce(self):
-        """次の跳ねるタイミングをランダムに予約 (0.8秒〜2.2秒の間)"""
-        if self.is_speaking:
-            interval = random.randint(800, 2200)
-            self.bounce_timer.start(interval)
-
-    def handle_random_bounce(self):
-        """発話中ならランダムな高さでピョコッと跳ねて次を予約"""
-        if self.is_speaking:
-            # 跳ねる高さも少し揺らぎを持たせる（-3.0px 〜 -6.0px）
-            self.bounce_y = random.uniform(-6.0, -3.0)
-            self.update()
-            self.schedule_next_bounce()
+        self.blink_timer.start(random.randint(4000, 9000))
 
     def start_blink(self):
-        """目を閉じる"""
         self.eye_open = False
         self.update()
-        # 140ミリ秒だけ目を閉じてから開ける
         QTimer.singleShot(120, self.end_blink)
 
     def end_blink(self):
-        """目を開けて次のまばたきを待機"""
         self.eye_open = True
         self.update()
         self.schedule_next_blink()
 
     def toggle_mouth(self):
-        """発話時の口開閉とバウンド"""
         if self.is_speaking:
             self.mouth_open = not self.mouth_open
         else:
             self.mouth_open = False
         self.update()
 
-    def trigger_bounce(self):
-        """発話中、たまに小さく跳ねる（控えめなぽよぽよ）"""
+    def schedule_next_bounce(self):
         if self.is_speaking:
-            # 控えめに -4px だけ跳ねる
-            self.bounce_y = -4.0
+            self.bounce_timer.start(random.randint(800, 2200))
+
+    def handle_random_bounce(self):
+        if self.is_speaking:
+            # アイコンが小さいので跳ね幅も控えめ (-2.0px 〜 -3.5px)
+            self.bounce_y = random.uniform(-3.5, -2.0)
             self.update()
+            self.schedule_next_bounce()
 
     def update_animation(self):
-        """跳ねた位置から元の接地位置へ減衰復帰"""
         if abs(self.bounce_y) > 0.1:
-            self.bounce_y *= 0.78  # 0.78を掛けて素早く元の位置に戻す
+            self.bounce_y *= 0.75
         else:
             self.bounce_y = 0.0
         self.update()
 
     def init_position(self):
-        """タスクバーの真上に接地するように配置"""
+        """タスクバー右側のトレイ領域（赤マークの位置）に埋め込む"""
         screen = QApplication.primaryScreen()
-        work_area = screen.availableGeometry()
+        full_rect = screen.geometry()          # 画面全体の領域
+        work_rect = screen.availableGeometry()  # タスクバーを除いた領域
 
-        # 画面右下付近（タスクバーの上端）
-        x = work_area.right() - self.width() - 40
-        y = work_area.bottom() - self.height()
+        # タスクバーの高さ（通常40〜48px程度）
+        taskbar_height = full_rect.bottom() - work_rect.bottom()
+        if taskbar_height <= 0:
+            taskbar_height = 48
+
+        # --- X座標の調整 ---
+        # 画面右端から時計・クイック設定・IMEを避けた「^」の右横付近
+        # ※ もし少しズレている場合は「215」の数値を増減（±20px程度）して微調整できます
+        x = full_rect.right() - 350
+
+        # --- Y座標の調整 ---
+        # タスクバーの上下中央にキャラクターが来るように配置
+        y = work_rect.bottom() + (taskbar_height - self.char_size) // 2 - self.bounce_margin
+        
         self.move(x, y)
+        print(f"[Debug] トレイ配置座標: X={x}, Y={y}")
+
+    def update_bubble_position(self):
+        """チャット画面を画面右端側にしっかり寄せて配置"""
+        screen = QApplication.primaryScreen()
+        work_rect = screen.availableGeometry()
+
+        # 画面右端から 16px の余白を空けてピタッと配置
+        bubble_x = work_rect.right() - self.bubble.width() - 16
+
+        # タスクバーの上端から 10px 浮かせた位置
+        bubble_y = work_rect.bottom() - self.bubble.height() - 10
+
+        self.bubble.move(bubble_x, bubble_y)
+        print(f"[Debug] チャット画面配置: X={bubble_x}, Y={bubble_y}")
+
+    def on_user_message(self, text: str):
+        # ユーザー送信時は待機し、1.2秒後に返答テスト
+        QTimer.singleShot(1200, self.simulate_ai_response)
+
+    def simulate_ai_response(self):
+        self.bubble.append_response("メッセージ受け取ったよ！")
+        self.start_speaking()
+        QTimer.singleShot(2200, self.stop_speaking)
+
+    def start_speaking(self):
+        self.is_speaking = True
+        self.bounce_y = -2.5
+        self.schedule_next_bounce()
+        self.update()
+
+    def stop_speaking(self):
+        self.is_speaking = False
+        self.bounce_timer.stop()
+        self.bounce_y = 0.0
+        self.mouth_open = False
+        self.update()
 
     def paintEvent(self, event):
-        """現在の口と目の状態に合わせてスプライトを正確に選択"""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
 
-        # 口が開いているかどうかの判定（発話中 かつ 口開きフラグがTrue）
         is_mouth_open = self.is_speaking and self.mouth_open
-
-        # 4つの状態を綺麗にマッピング
         if is_mouth_open:
             key = "talk_open" if self.eye_open else "talk_closed"
         else:
             key = "idle_open" if self.eye_open else "idle_closed"
 
         pixmap = self.sprites[key]
-
-        # bounce_margin（上部余白）+ bounce_y（跳ね量）の位置に描画
         draw_y = self.bounce_margin + self.bounce_y
         painter.drawPixmap(0, int(draw_y), pixmap)
 
     def mousePressEvent(self, event):
-        """左クリックで発話トグル、右クリックで終了"""
         if event.button() == Qt.MouseButton.LeftButton:
-            self.is_speaking = not self.is_speaking
-            if self.is_speaking:
-                # 喋り始めた瞬間に最初の跳ねを予約（喋り出しでピョコッと跳ねる）
-                self.bounce_y = -4.5
-                self.schedule_next_bounce()
+            if self.bubble.isVisible():
+                self.bubble.hide()
             else:
-                self.bounce_timer.stop()
-                self.bounce_y = 0.0
-
-            status = "発話中（おしゃべり）" if self.is_speaking else "待機中（おとなしい）"
-            print(f"[状態切り替え]: {status}")
-            self.update()
+                self.update_bubble_position()
+                self.bubble.show()
+                self.bubble.input_field.setFocus()
         elif event.button() == Qt.MouseButton.RightButton:
             print("アプリを終了します。")
+            self.bubble.close()
             QApplication.quit()
 
 
