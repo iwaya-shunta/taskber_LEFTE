@@ -1,4 +1,5 @@
 import re
+import os
 import requests
 from pathlib import Path
 from PySide6.QtCore import QObject, Signal, QThread, QUrl, QTimer
@@ -67,13 +68,15 @@ class SynthesisWorker(QThread):
                 f"{VOICEVOX_HOST}/synthesis",
                 params={"speaker": SPEAKER_ID},
                 json=query_data,
-                timeout=15
+                timeout=60
             )
             synth_res.raise_for_status()
 
             # 4. 保存
             with open(TEMP_VOICE_PATH, "wb") as f:
                 f.write(synth_res.content)
+                f.flush()
+                os.fsync(f.fileno())
 
             self.finished_synthesis.emit(str(TEMP_VOICE_PATH))
 

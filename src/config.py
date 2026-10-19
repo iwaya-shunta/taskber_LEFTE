@@ -39,5 +39,5 @@ VOICE_INTONATION_SCALE = 1.0 # 抑揚 (1.0が標準)
 VOICE_VOLUME_SCALE = 1.0   # 音量
 
 # --- バックエンドサーバー（LEFTE）設定 ---
-SERVER_HOST = "http://localhost:8000" # サーバーのアドレス（Raspberry Pi等のIPにする場合はここを変更）
+SERVER_HOST = "http://100.107.71.51:8000" # サーバーのアドレス（Raspberry Pi等のIPにする場合はここを変更）
 CHAT_ENDPOINT = f"{SERVER_HOST}/chat"

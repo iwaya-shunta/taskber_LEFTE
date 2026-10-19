@@ -55,9 +55,9 @@ class DesktopAssistantApp:
         bubble_y = work_rect.bottom() - self.bubble.height() - 45
         self.bubble.move(bubble_x, bubble_y)
 
-    def handle_user_message(self, text: str):
-        # ユーザーの入力をサーバーへ非同期送信
-        self.backend.send_message(text)
+    def handle_user_message(self, text: str, files: list = None):
+        # ユーザーのメッセージと添付ファイルをサーバーへ送信
+        self.backend.send_message(text, files)
 
     def handle_server_response(self, reply_text: str):
         # サーバーからの返答をチャット欄に表示
@@ -66,10 +66,25 @@ class DesktopAssistantApp:
         self.voice.speak(reply_text)
 
     def quit_app(self):
-        """アプリケーション正常終了処理"""
-        print("[App]: アプリケーションを終了します。")
-        self.voice_manager.stop_engine()
-        QApplication.quit()
+        if hasattr(self, 'chat_window') and self.chat_window:
+            try:
+                if hasattr(self.chat_window, 'cleanup_and_close'):
+                    self.chat_window.cleanup_and_close()
+                else:
+                    self.chat_window.close()
+            except Exception as e:
+                print(f"[Exit Error]: {e}")
+
+        # 2. プロセスマネージャー（VOICEVOX等の停止）があれば終了
+        if hasattr(self, 'process_manager') and self.process_manager:
+            try:
+                self.process_manager.stop_all()
+            except Exception:
+                pass
+
+        # 3. アプリケーション終了
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance().quit()
 
 
 if __name__ == "__main__":
