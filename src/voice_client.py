@@ -125,3 +125,35 @@ class VoicevoxClient(QObject):
         if status == QMediaPlayer.MediaStatus.EndOfMedia:
             # 語尾の自然な余韻マージン
             QTimer.singleShot(150, self.playback_finished.emit)
+    
+    def register_word(self, surface: str, pronunciation: str, accent_type: int = 1) -> bool:
+        """VOICEVOX Engine にユーザー辞書単語を登録する"""
+        try:
+            import requests
+            url = f"{self.base_url}/user_dict_word"
+            params = {
+                "surface": surface,
+                "pronunciation": pronunciation,
+                "accent_type": accent_type
+            }
+            res = requests.post(url, params=params, timeout=3.0)
+            return res.status_code == 200
+        except Exception as e:
+            print(f"[Dict Register Error]: {e}")
+            return False
+
+    def register_word(self, surface: str, pronunciation: str, accent_type: int = 1) -> bool:
+        """VOICEVOX Engine にユーザー辞書単語を登録する"""
+        try:
+            import requests
+            url = "http://127.0.0.1:50021/user_dict_word"
+            params = {
+                "surface": surface,
+                "pronunciation": pronunciation,
+                "accent_type": accent_type
+            }
+            res = requests.post(url, params=params, timeout=3.0)
+            return res.status_code == 200
+        except Exception as e:
+            print(f"[Dict Register Error]: {e}")
+            return False

@@ -15,8 +15,8 @@ VOICEVOX_EXE_PATH = r"C:\Program Files\VOICEVOX\VOICEVOX.exe"
 TEMP_VOICE_PATH = CACHE_DIR / "temp_voice.wav"
 
 # マスコット設定
-CHAR_SIZE = 65           # アイコン表示サイズ
-BOUNCE_MARGIN = 10       # バウンド用の上部余白
+CHAR_SIZE = 120           # アイコン表示サイズ
+BOUNCE_MARGIN = int(CHAR_SIZE*0.5)       # バウンド用の上部余白
 TRAY_OFFSET_X = 230      # 画面右端からの距離（100〜120あたり）
 MOUTH_INTERVAL_MS = 110  # 口パクの切り替え速度 (ms)
 BLINK_MIN_MS = 4000      # まばたき最小間隔 (ms)

@@ -30,7 +30,7 @@ class MessageBubble(QWidget):
         # 吹き出し本体用のコンテナ
         bubble_box = QWidget()
         box_layout = QVBoxLayout(bubble_box)
-        box_layout.setContentsMargins(8, 8, 8, 8)
+        box_layout.setContentsMargins(10, 8, 10, 8)
         box_layout.setSpacing(6)
 
         # 添付画像のプレビュー追加
@@ -41,13 +41,11 @@ class MessageBubble(QWidget):
                     img_label = QLabel()
                     pixmap = QPixmap(str(p))
                     if not pixmap.isNull():
-                        # 幅最大 180px、高さ最大 140px でアスペクト比維持縮小
                         scaled_pixmap = pixmap.scaled(
                             180, 140,
                             Qt.AspectRatioMode.KeepAspectRatio,
                             Qt.TransformationMode.SmoothTransformation
                         )
-                        # 角丸クリッピング
                         rounded_pixmap = self._get_rounded_pixmap(scaled_pixmap, 8)
                         img_label.setPixmap(rounded_pixmap)
                         img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -57,6 +55,10 @@ class MessageBubble(QWidget):
         if text.strip():
             label = QLabel(text)
             label.setWordWrap(True)
+            # ★ ここを修正: Preferred / Preferred に戻す
+            label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+            # ★ 吹き出し内部の最大幅を指定して、長い英数字でも折り返しを強制する
+            label.setMaximumWidth(250)
             label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
             label.setStyleSheet("color: #FFFFFF; font-size: 13px; background: transparent;")
             box_layout.addWidget(label)
@@ -183,7 +185,7 @@ class ChatBubble(QWidget):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAcceptDrops(True)  # ドラッグ＆ドロップ受け入れ
-        self.resize(360, 460)
+        self.resize(360, 860)
 
         outer_layout = QVBoxLayout(self)
         outer_layout.setContentsMargins(8, 8, 8, 8)
@@ -203,7 +205,7 @@ class ChatBubble(QWidget):
         container_layout.setSpacing(6)
 
         # ヘッダー
-        header = QLabel("L.E.F.T.E. ver.2.0", self.container)
+        header = QLabel("L.E.F.T.E. ver.2.01", self.container)
         header.setStyleSheet("color: #8E8E93; font-size: 12px; font-weight: bold;")
         container_layout.addWidget(header)
 
@@ -305,6 +307,7 @@ class ChatBubble(QWidget):
         clean_text = re.sub(r"\[img:\s*(.*?)\]", "", content).strip()
         clean_text = re.sub(r"\[file:\s*(.*?)\]", "", clean_text).strip()
         clean_text = re.sub(r"\[(slow|normal|fast)\]", "", clean_text).strip()
+        clean_text = re.sub(r"\[tool_code[\s\S]*?(\]|\Z)", "", clean_text).strip()
 
         # 🚀 直前の吹き出しと内容が全く同じなら二重描画を防止
         for i in range(self.chat_layout.count() - 1, -1, -1):

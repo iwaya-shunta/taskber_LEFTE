@@ -1,7 +1,7 @@
 import sys
 import random
-from PySide6.QtWidgets import QWidget, QApplication
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtWidgets import QWidget, QApplication, QMenu
+from PySide6.QtCore import Qt, QTimer, Signal, QPoint
 from PySide6.QtGui import QPainter, QPixmap
 
 # Windows用の最前面固定API
@@ -19,8 +19,9 @@ from src.config import (
 )
 
 class MascotWidget(QWidget):
-    """タスクバートレイに常駐するPNGTuberマスコット"""
+    """タスクバートレイに常駐するPNGTuberマスコット（VTuberレイヤー合成方式）"""
     clicked = Signal()
+    right_clicked = Signal(QPoint)
 
     def __init__(self):
         super().__init__()
@@ -35,11 +36,15 @@ class MascotWidget(QWidget):
         self.bounce_margin = BOUNCE_MARGIN
         self.resize(self.char_size, self.char_size + self.bounce_margin)
 
-        self.sprites = {
-            "idle_open": self.load_sprite("idle_open.png"),
-            "idle_closed": self.load_sprite("idle_closed.png"),
-            "talk_open": self.load_sprite("talk_open.png"),
-            "talk_closed": self.load_sprite("talk_closed.png"),
+        # 1. 固定ベース（体・頭部）
+        self.base_sprite = self.load_sprite("body_base.png")
+
+        # 2. 表情パーツ（目・口の差分レイヤー）
+        self.exp_sprites = {
+            "idle_open": self.load_sprite("wave_exp_idle_open.png"),
+            "idle_closed": self.load_sprite("wave_exp_idle_closed.png"),
+            "talk_open": self.load_sprite("wave_exp_talk_open.png"),
+            "talk_closed": self.load_sprite("wave_exp_talk_closed.png"),
         }
 
         self.is_speaking = False
@@ -112,21 +117,19 @@ class MascotWidget(QWidget):
             self.bounce_y = 0.0
         self.update()
 
-    # src/mascot.py 内の init_position を修正
     def init_position(self):
         screen = QApplication.primaryScreen()
-        work_rect = screen.availableGeometry()  # ★ タスクバーを除いた作業領域
+        work_rect = screen.availableGeometry()  # タスクバーを除いた作業領域
 
         # X座標: トレイアイコンの左側
         x = work_rect.right() - TRAY_OFFSET_X
         # Y座標: タスクバーの上端にちょうど乗せる
-        y = work_rect.bottom() - self.height() +20
+        y = work_rect.bottom() - self.height() + 20
 
         self.move(x, y)
 
     def showEvent(self, event):
         super().showEvent(event)
-        # Windowsの最前面レイヤー（HWND_TOPMOST）を直接セット
         if sys.platform == "win32":
             hwnd = int(self.winId())
             ctypes.windll.user32.SetWindowPos(
@@ -137,14 +140,16 @@ class MascotWidget(QWidget):
     def start_speaking(self):
         self.is_speaking = True
         self.bounce_y = -2.5
+        if not self.mouth_timer.isActive():
+            self.mouth_timer.start(MOUTH_INTERVAL_MS)
         self.schedule_next_bounce()
         self.update()
 
     def stop_speaking(self):
         self.is_speaking = False
-        self.mouth_state = "close"     # ★ 口を閉じる状態に戻す
-        self.mouth_timer.stop()        # 口パク用タイマーを停止
-        self.bounce_y = 0.0            # バウンド位置をリセット
+        self.mouth_open = False
+        self.mouth_timer.stop()
+        self.bounce_y = 0.0
         self.update()
 
     def paintEvent(self, event):
@@ -152,18 +157,23 @@ class MascotWidget(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
 
+        draw_y = int(self.bounce_margin + self.bounce_y)
+
+        # 1. 常に固定のベース（体・頭部）を描画
+        painter.drawPixmap(0, draw_y, self.base_sprite)
+
+        # 2. 状態に応じた表情パーツを同じ位置に上書き合成
         is_mouth_open = self.is_speaking and self.mouth_open
         if is_mouth_open:
-            key = "talk_open" if self.eye_open else "talk_closed"
+            exp_key = "talk_open" if self.eye_open else "talk_closed"
         else:
-            key = "idle_open" if self.eye_open else "idle_closed"
+            exp_key = "idle_open" if self.eye_open else "idle_closed"
 
-        pixmap = self.sprites[key]
-        draw_y = self.bounce_margin + self.bounce_y
-        painter.drawPixmap(0, int(draw_y), pixmap)
+        if exp_key in self.exp_sprites:
+            painter.drawPixmap(0, draw_y, self.exp_sprites[exp_key])
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit()
         elif event.button() == Qt.MouseButton.RightButton:
-            QApplication.quit()
+            self.right_clicked.emit(event.globalPosition().toPoint())

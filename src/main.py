@@ -1,5 +1,7 @@
 import sys
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMenu
+from PySide6.QtCore import QPoint
+from src.dict_dialog import UserDictDialog
 
 from src.mascot import MascotWidget
 from src.chat_bubble import ChatBubble
@@ -19,6 +21,7 @@ class DesktopAssistantApp:
 
         # イベント接続
         self.mascot.clicked.connect(self.toggle_chat)
+        self.mascot.right_clicked.connect(self.show_context_menu)
         self.bubble.message_sent.connect(self.handle_user_message)
 
         # サーバーからの応答受信時にチャット追加 ＆ VOICEVOX発話
@@ -51,8 +54,9 @@ class DesktopAssistantApp:
         screen = QApplication.primaryScreen()
         work_rect = screen.availableGeometry()
 
-        bubble_x = work_rect.right() - self.bubble.width() + 2
-        bubble_y = work_rect.bottom() - self.bubble.height() - 45
+        bubble_x = self.mascot.x() + (self.mascot.width() // 2) - (self.bubble.width() // 2)
+        bubble_y = self.mascot.y() - self.bubble.height()
+
         self.bubble.move(bubble_x, bubble_y)
 
     def handle_user_message(self, text: str, files: list = None):
@@ -64,6 +68,25 @@ class DesktopAssistantApp:
         self.bubble.append_response(reply_text)
         # 返答テキストをVOICEVOXで喋らせる（口パク自動連動）
         self.voice.speak(reply_text)
+
+    def show_context_menu(self, global_pos: QPoint):
+        menu = QMenu()
+        dict_action = menu.addAction("辞書登録")
+        menu.addSeparator()
+        quit_action = menu.addAction("終了")
+
+        selected_action = menu.exec(global_pos)
+
+        # 何も選ばずにメニュー外をクリックした場合は selected_action が None になるためガード
+        if not selected_action:
+            return
+
+        if selected_action == dict_action:
+            # 親ウィンドウを None にして単独ダイアログとして開く
+            dialog = UserDictDialog(self.voice)
+            dialog.exec()
+        elif selected_action == quit_action:
+            self.quit_app()
 
     def quit_app(self):
         if hasattr(self, 'chat_window') and self.chat_window:
@@ -89,6 +112,7 @@ class DesktopAssistantApp:
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    app.setQuitOnLastWindowClosed(False)  # ★ 追加: ダイアログ終了時の道連れ終了を防止
     assistant = DesktopAssistantApp()
     app.aboutToQuit.connect(assistant.voice_manager.stop_engine)
     sys.exit(app.exec())
